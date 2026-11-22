@@ -1,0 +1,8 @@
+{
+  "id": "calendar",
+  "name": "Calendar",
+  "version": "0.1.0",
+  "author": "Notia",
+  "description": "A month calendar in the right sidebar. Selecting a day lists notes whose path contains that date.",
+  "main": "main.js"
+}
