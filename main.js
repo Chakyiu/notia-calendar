@@ -17,6 +17,16 @@ const MONTHS = [
 
 const WEEKDAYS = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
 
+const WEEKDAY_NAMES = [
+  "Sunday",
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+];
+
 function isoDate(date) {
   const month = String(date.getMonth() + 1).padStart(2, "0");
   const day = String(date.getDate()).padStart(2, "0");
@@ -44,6 +54,19 @@ function notesOn(app, day) {
     .getNotes()
     .filter((note) => pathHasDay(note.path, day))
     .sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0));
+}
+
+// The first line of body text, so a listed note shows a preview instead of
+// repeating its path. Headings are skipped because the note name already
+// carries the title.
+function previewOf(app, note) {
+  if (!app.vault.exists(note.path)) return note.path;
+  for (const raw of app.vault.read(note.path).split("\n")) {
+    const line = raw.trim();
+    if (!line || line.startsWith("#")) continue;
+    return line.length > 120 ? `${line.slice(0, 119)}\u2026` : line;
+  }
+  return note.path;
 }
 
 function monthCells(year, month) {
@@ -87,15 +110,56 @@ export default class Calendar extends Plugin {
     this.panel.refresh();
   }
 
+  // One quiet cell per date: no outline unless it is today, and the filled
+  // accent is reserved for the selected date.
   dayButton(date) {
     const key = isoDate(date);
-    const inMonth = date.getMonth() === this.month && date.getFullYear() === this.year;
-    let variant = inMonth || key === this.today ? "outline" : "ghost";
+    let variant = "ghost";
     if (key === this.selected) variant = "primary";
+    else if (key === this.today) variant = "outline";
     return ui.button(String(date.getDate()).padStart(2, " "), () => this.select(date), {
       variant,
       tooltip: key,
     });
+  }
+
+  dayHeading() {
+    const [year, month, day] = this.selected.split("-").map(Number);
+    const weekday = WEEKDAY_NAMES[new Date(year, month - 1, day).getDay()];
+    return `${weekday} \u00b7 ${this.selected}`;
+  }
+
+  createNote() {
+    const path = `${this.selected}.md`;
+    if (!this.app.vault.exists(path)) this.app.vault.create(path, "");
+    this.app.workspace.openNote(path);
+  }
+
+  dayDetails(notes) {
+    const count = notes.length
+      ? ui.text(`${notes.length} ${notes.length === 1 ? "note" : "notes"}`, {
+          muted: true,
+          small: true,
+        })
+      : null;
+    return ui.column([
+      ui.row([ui.text(this.dayHeading(), { bold: true }), count], {
+        wrap: false,
+        spread: true,
+      }),
+      notes.length
+        ? ui.list(
+            notes.map((note) => ({
+              title: note.name,
+              subtitle: previewOf(this.app, note),
+              onClick: () => this.app.workspace.openNote(note.path),
+            })),
+          )
+        : ui.column([
+            ui.text("No notes on this day", { muted: true }),
+            ui.button("Create a note", () => this.createNote(), { variant: "primary" }),
+          ]),
+    ]);
   }
 
   renderPanel() {
@@ -105,7 +169,7 @@ export default class Calendar extends Plugin {
       rows.push(
         ui.row(
           cells.slice(week * 7, week * 7 + 7).map((date) => this.dayButton(date)),
-          { wrap: false },
+          { wrap: false, spread: true },
         ),
       );
     }
@@ -132,16 +196,8 @@ export default class Calendar extends Plugin {
         { wrap: false, spread: true },
       ),
       ...rows,
-      ui.heading(this.selected),
-      notes.length
-        ? ui.list(
-            notes.map((note) => ({
-              title: note.name,
-              subtitle: note.path,
-              onClick: () => this.app.workspace.openNote(note.path),
-            })),
-          )
-        : ui.empty("No notes on this day"),
+      ui.separator(),
+      this.dayDetails(notes),
     ];
   }
 }
