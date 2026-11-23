@@ -127,7 +127,8 @@ export default class Calendar extends Plugin {
     if (daysWithNotes.has(key)) {
       options.dot = variant === "primary" ? "primaryForeground" : true;
     }
-    return ui.button(String(date.getDate()).padStart(2, " "), () => this.select(date), options);
+    // The cell is centred in an equal track, so the numeral carries no padding.
+    return ui.button(String(date.getDate()), () => this.select(date), options);
   }
 
   // The 42 visible days that at least one note falls on, so a render scans the
@@ -198,7 +199,11 @@ export default class Calendar extends Plugin {
           cells
             .slice(week * 7, week * 7 + 7)
             .map((date) => this.dayButton(date, daysWithNotes)),
-          { wrap: false, spread: true },
+          // One equal track per weekday, so every date shares the centre axis of
+          // its column and each row keeps the same 36px pitch. `spread` stays on
+          // the node: a host from before these fields ignores them and draws the
+          // old full-width flex row, which is still the right fallback.
+          { wrap: false, spread: true, columns: 7, gap: 0, rowHeight: 36 },
         ),
       );
     }
@@ -208,7 +213,9 @@ export default class Calendar extends Plugin {
         this.monthRow(),
         ui.row(
           WEEKDAYS.map((label) => ui.text(label, { muted: true, small: true })),
-          { wrap: false, spread: true },
+          // Same seven tracks and gap as the week rows, so a label sits over
+          // the column it names.
+          { wrap: false, spread: true, columns: 7, gap: 0 },
         ),
         ui.column(rows, { gap: 0 }),
       ],
